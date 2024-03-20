@@ -12,8 +12,8 @@
   <script type="text/template" id="job-template">
     <div class="flex flex-column ma2">
       <div class="flex justify-between mb2">
-        <div class='mt2 mb1'><span class="hk-label">Job ID:</span> {{id}}</div>
-        <div class='mt2 mb1'><span class="hk-label">State:</span> {{state}}</div>
+        <div class='mt2 mb1'><span class="hk-label">Job ID:</span> {{id}} - {{date}}</div>
+        <div class='mt2 mb1'><span class="hk-label">State:</span> {{state}} {{reason}} </div>
       </div>
       <div class="w-100 br1 shadow-inner-1 bg-light-silver">
         <span class="db h1 br1 {{color}}" style="width: {{progress}}%;"></span>
@@ -22,12 +22,20 @@
   </script>
   <div class="main-content flex flex-column justify-center items-center w-100 mt4">
     <div class='br2 flex flex-column items-center pv3'>
-      <div class='f1 mt2 mb1'>Create long-running jobs</div>
+      <div class='f1 mt2 mb1'>Photos Migration</div>
       <div class='flex mt2'>
         <a href='#' id="add-job" class='f2 link purple ph2 pv1 ba b--purple br1 mr4'>Add Job</a>
-        <a href='#' id="clear" class='f2 link purple ph2 pv1 ba b--purple br1'>Clear</a>
+        <a href='#' id="see-jobs" class='f2 link purple ph2 pv1 ba b--purple br1 mr4'>See Jobs</a>
+        <a href='#' id="clear" class='f2 link purple ph2 pv1 ba b--purple br1 mr4'>Clear Jobs</a>
       </div>
-    </div>
+      <div class='flex mt2'>
+        <b>See Jobs</b>: 
+        Job start: <input id="job-start" type="number" pattern="^\d{4}-\d{2}-\d{2}$" placeholder="1" /> - 
+        Job end:   <input id="job-end" type="number" pattern="^\d{4}-\d{2}-\d{2}$" placeholder="10" /> 
+      </div>
+      <div class='flex mt2'>
+        <b>Add Job</b>: Date (YYYY-MM-DD): <input id="job-date" placeholder="2024-01-01" /> 
+      </div>
     <div id="job-summary" class="w-80 f3"></div>
     <div class="h6 flex flex-column justify-end">
       <div class="shadow-3 pa4 tc f3">
