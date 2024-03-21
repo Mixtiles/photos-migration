@@ -20,7 +20,7 @@ function start() {
   const workQueue = new Queue('work', redisOptions);
 
   workQueue.process(maxJobsPerWorker, async (job) => {
-    log.info(`Date ${job.data.date}: Running job ${job} for date ${job.data.date}`);
+    log.info(`Date ${job.data.date}: Running job ${job.id} for date ${job.data.date}`);
     job.progress(0);
     return await migration.migratePhotosFromDate(job);
   });

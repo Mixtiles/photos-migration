@@ -1,4 +1,4 @@
-const PORT = parseInt(process.env.PORT )
+const PORT = parseInt(process.env.PORT)
 const REDIS_URL = process.env.REDIS_URL
 const WEB_CONCURRENCY = parseInt(process.env.WEB_CONCURRENCY);
 const MONGO_URL = process.env.MONGO_URL
@@ -13,6 +13,9 @@ const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
 const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID
 const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY
 const LOCAL = process.env.LOCAL ?? false
+
+const { log } = require('./log');
+log.info(`REDIS_URL: ${REDIS_URL}`)
 
 if (!PORT || !REDIS_URL || !WEB_CONCURRENCY || !MONGO_URL || !MONGO_DB_NAME || 
     !BATCH_SIZE || !DRY_RUN || !MAX_PHOTOS_PER_DAY || !UPLOADS_TRANSFORMED_BUCKET || 
