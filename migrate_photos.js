@@ -16,7 +16,6 @@ const {
     CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET,
     CLOUDINARY_CLOUD_NAME,
-    redisOptions
 } = require('./env_vars');
 
 
@@ -43,7 +42,7 @@ cloudinary.config({
 
 async function migratePhotosFromDate (job) {
     const mongoClient = new MongoClient(MONGO_URL);
-    const redisClient = createClient(redisOptions)
+    const redisClient = createClient({ url: REDIS_URL})
     let wasLocked = false;
     try {
         const dateStr = job.data.date;
