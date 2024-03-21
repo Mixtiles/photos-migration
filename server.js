@@ -1,6 +1,7 @@
 const express = require('express');
 const Queue = require('bull');
 const { redisOptions, PORT } = require('./env_vars');
+const { log } = require('./log');
 
 // Serve on PORT on Heroku and on localhost:5000 locally
 // Connect to a local redis intance locally, and the Heroku-provided URL in production
@@ -53,7 +54,7 @@ app.get('/job/:id', async (req, res) => {
 
 // You can listen to global events to get notified when jobs are processed
 workQueue.on('global:completed', (jobId, result) => {
-  console.log(`Job completed with result ${result}`);
+  log.info(`Job ${jobId} completed with result ${result}`);
 });
 
-app.listen(PORT, () => console.log("Server started!"));
+app.listen(PORT, () => log.info("Server started!"));

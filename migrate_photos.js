@@ -3,6 +3,7 @@ const cloudinary = require('cloudinary');
 const { uploadStreamToS3 } = require('./common');
 const axios = require('axios');
 const { createClient } = require('redis');
+const { log } = require('./log');
 
 const {
     MONGO_URL,
@@ -48,20 +49,20 @@ async function migratePhotosFromDate (job) {
 
         await mongoClient.connect();
         const db = mongoClient.db(MONGO_DB_NAME);
-        console.log(`Date ${dateStr}: Connected successfully to Mongo server`);
+        log.info(`Date ${dateStr}: Connected successfully to Mongo server`);
 
         await redisClient.connect();
-        console.log(`Date ${dateStr}: Connected successfully to Redis server`);
+        log.info(`Date ${dateStr}: Connected successfully to Redis server`);
         wasLocked = await redisClient.setNX(`lock:${dateStr}`, job.id);
         if (!wasLocked) {
             lockingJobId = await redisClient.get(`lock:${dateStr}`);
             const error = `Date ${dateStr}: Already locked by job id ${lockingJobId}!`
-            console.error(error);
+            log.error(error);
             throw new Error(error);
         }
 
         const photos = await getPhotos(dateStr, db);
-        console.log(`Date ${dateStr}: Found ${photos.length} photos to migrate`);
+        log.info(`Date ${dateStr}: Found ${photos.length} photos to migrate`);
 
         let numPhotosMigrated = 0;
         for (let i = 0; i < photos.length; i += BATCH_SIZE) {
@@ -73,7 +74,7 @@ async function migratePhotosFromDate (job) {
         
         return { status: 'Success', numPhotosQueried: photos.length, numPhotosMigrated};
     } catch (err) {
-        console.error(err);
+        log.error(err);
         throw err;
     } finally {
         // Ensures closing on finish / error
@@ -81,7 +82,7 @@ async function migratePhotosFromDate (job) {
         if (wasLocked) {
             const numLocksDeleted = await redisClient.del(`lock:${job.data.date}`);
             if (numLocksDeleted != 1) {
-                console.error(`Date ${dateStr}: Failed to delete lock "lock:${job.data.date}"! numLocksDeleted=${numLocksDeleted}!`);
+                log.error(`Date ${dateStr}: Failed to delete lock "lock:${job.data.date}"! numLocksDeleted=${numLocksDeleted}!`);
             }
         }
         await redisClient.disconnect();
@@ -129,10 +130,10 @@ async function getPhotos(dateStr, db) {
 async function migratePhoto(dateStr, photo, db) {
     try {
 
-        console.log(`Date ${dateStr}: Photo ${photo._id}: Start migrating...`);
+        log.info(`Date ${dateStr}: Photo ${photo._id}: Start migrating...`);
 
         if (!photo.jigVersion) {
-            console.log(`Date ${dateStr}: Photo ${photo._id}: No jigVersion, skipping...`);
+            log.info(`Date ${dateStr}: Photo ${photo._id}: No jigVersion, skipping...`);
             return 0;
         }
 
@@ -168,11 +169,11 @@ async function migratePhoto(dateStr, photo, db) {
                 photo.photoUrl.match(/res.cloudinary.com.*\/upload\//) &&
                 photo.photoUrl.match(ALLOWED_CLOUDINARY_UPLOADS)
             ) {
-                console.log(`Date ${dateStr}: Photo ${photo._id}: only photoUrl is Cloudinary upload, of an allowed type (meaning already migrated), skipping...`);
+                log.info(`Date ${dateStr}: Photo ${photo._id}: only photoUrl is Cloudinary upload, of an allowed type (meaning already migrated), skipping...`);
                 return 0;    
             } else {
                 const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, not all 7 photos are Cloudinary upload!`
-                console.error(error);
+                log.error(error);
                 throw new Error(error);
             }
         }
@@ -186,7 +187,7 @@ async function migratePhoto(dateStr, photo, db) {
             (photo.smallThumb.match(/\/upload\//g) || []).length != 1
         ) {
             const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, not all 7 photos have exactly 1 aprearance of /upload/ in their URL!`
-            console.error(error);
+            log.error(error);
             throw new Error(error);
         }
         if (
@@ -199,7 +200,7 @@ async function migratePhoto(dateStr, photo, db) {
             (photo.smallThumb.match(/\/fetch\//g) || []).length != 0
         ) {
             const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, not all 7 photos have exactly 0 aprearance of /fetch/ in their URL!`
-            console.error(error);
+            log.error(error);
             throw new Error(error);
         }
 
@@ -222,7 +223,7 @@ async function migratePhoto(dateStr, photo, db) {
             !smallThumbFileName == photoUrlFileName
         ) {
             const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, not all 6 photos are the same Cloudinary upload!`
-            console.error(error);
+            log.error(error);
             throw new Error(error);
         }
         if (
@@ -234,25 +235,25 @@ async function migratePhoto(dateStr, photo, db) {
             !photo.smallThumb.match(/res.cloudinary.com.*\/image\/upload\//)
         ) {
             const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, not all 6 photos include /image/upload/ in their URL!`
-            console.error(error);
+            log.error(error);
             throw new Error(error);
         }
 
         if (jigVersionFileName.endsWith('.pdf')) {
-            console.log(`Date ${dateStr}: Photo ${photo._id}: jigVersion is a PDF.`);
+            log.info(`Date ${dateStr}: Photo ${photo._id}: jigVersion is a PDF.`);
             const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.jigVersion);
-            after.jigVersion = await migrateToS3(downloadUrl, publicId, format);
+            after.jigVersion = await migrateToS3(dateStr, photo, downloadUrl, publicId, format);
             migratedFiles.push({from: downloadUrl, to: after.jigVersion, fromFormat: format, fromPublicId: publicId});
         } else {
-            console.log(`Date ${dateStr}: Photo ${photo._id}: jigVersion is an image.`);
+            log.info(`Date ${dateStr}: Photo ${photo._id}: jigVersion is an image.`);
             if (!jigVersionFileName == photoUrlFileName) {
                 const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, non-PDF jigVersion is not same Cloudinary upload!`
-                console.error(error);
+                log.error(error);
                 throw new Error(error);
             }
             if (!photo.jigVersion.match(/res.cloudinary.com.*\/image\/upload\//)) {
                 const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, non-PDF jigVersion doesn't include /image/upload/ in its URL!`
-                console.error(error);
+                log.error(error);
                 throw new Error(error);
             }
         }
@@ -260,7 +261,7 @@ async function migratePhoto(dateStr, photo, db) {
         let s3Url
         if (photoUrlBaseFileName != jigVersionBaseFileName || photo.url.match(/cloudinary/)) {
             const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.fullsize)
-            s3Url = await migrateToS3(downloadUrl, publicId, format)
+            s3Url = await migrateToS3(dateStr, photo, downloadUrl, publicId, format)
             migratedFiles.push({from: downloadUrl, to: s3Url, fromFormat: format, fromPublicId: publicId});
         } else {
             // s3Url here means non-Cloudinary. Almost always it's S3, but it still could be in other domains (filestck.com, etc.)
@@ -278,12 +279,12 @@ async function migratePhoto(dateStr, photo, db) {
         after.smallThumb = transformToFetchUrl(photo.smallThumb, s3Url);
 
         if (DRY_RUN != 'false') {
-            console.log(`Date ${dateStr}: Photo ${photo._id}: Dry run, not updating...`);
-            console.log(`Date ${dateStr}: Photo ${photo._id}: Before:`, JSON.stringify(before));
-            console.log(`Date ${dateStr}: Photo ${photo._id}: After:`, JSON.stringify(after));
-            console.log(`Date ${dateStr}: Photo ${photo._id}: Migrated files:`, JSON.stringify(migratedFiles));
+            log.info(`Date ${dateStr}: Photo ${photo._id}: Dry run, not updating...`);
+            log.info(`Date ${dateStr}: Photo ${photo._id}: Before: ${JSON.stringify(before)}`);
+            log.info(`Date ${dateStr}: Photo ${photo._id}: After: ${JSON.stringify(after)}`);
+            log.info(`Date ${dateStr}: Photo ${photo._id}: Migrated files: ${JSON.stringify(migratedFiles)}`);
         } else {
-            console.log(`Date ${dateStr}: Photo ${photo._id}: Updating...`);
+            log.info(`Date ${dateStr}: Photo ${photo._id}: Updating...`);
             const updateLogResult = await db.collection('PhotoMigrationLog').insertOne(
                 { 
                     _created_at: new Date(),
@@ -297,7 +298,7 @@ async function migratePhoto(dateStr, photo, db) {
             );
             if (!updateLogResult.acknowledged || !updateLogResult.insertedId) {
                 const error = `Date ${dateStr}: Photo ${photo._id}: Failed to insert migration log! updateLogResult=${JSON.stringify(updateLogResult)}!`
-                console.error(error);
+                log.error(error);
                 throw new Error(error);
             }
             const updatePhotoResult = await db.collection('Photo').updateOne(
@@ -306,16 +307,16 @@ async function migratePhoto(dateStr, photo, db) {
             );
             if (!updatePhotoResult.acknowledged || updatePhotoResult.modifiedCount != 1) {
                 const error = `Date ${dateStr}: Photo ${photo._id}: Failed to update! updatePhotoResult=${JSON.stringify(updatePhotoResult)}!`
-                console.error(error);
+                log.error(error);
                 throw new Error(error);
             }
-            console.log(`Date ${dateStr}: Photo ${photo._id}: Updated.`);
+            log.info(`Date ${dateStr}: Photo ${photo._id}: Updated.`);
         }
 
-        console.log(`Date ${dateStr}: Photo ${photo._id}: Done migrating.`);
+        log.info(`Date ${dateStr}: Photo ${photo._id}: Done migrating.`);
         return 1;
     } catch (err) {
-        console.error(`Date ${dateStr}: Photo ${photo._id}: Error - ${err}`);
+        log.error(`Date ${dateStr}: Photo ${photo._id}: Error - ${err}`);
         try {
             await db.collection('PhotoMigrationLog').insertOne(
                 { 
@@ -327,7 +328,7 @@ async function migratePhoto(dateStr, photo, db) {
                 }
             );
         } catch (err2) {
-            console.error(`Date ${dateStr}: Photo ${photo._id}: Error updating DB with error - ${err2}`);
+            log.error(`Date ${dateStr}: Photo ${photo._id}: Error updating DB with error - ${err2}`);
             return 0;
         }
         return 0;
@@ -348,7 +349,7 @@ async function getCloudinaryComponents(dateStr, photo, cloudinaryUrl) {
             cloudinaryEnv = cloudinaryUrl.match(/res.cloudinary.com\/([^\/]+)\/image\/upload/)?.[1]
             if (cloudinaryEnv != 'mixtiles' && cloudinaryEnv != 'mixtiles-dev') {
                 const error = `Date ${dateStr}: Photo ${photo._id}: Cloudinary URL ${cloudinaryUrl} could not be matched to an environment that is part of this migration: "${cloudinaryEnv}"!`
-                console.error(error);
+                log.error(error);
                 throw new Error(error);
             }
             downloadUrl = `https://res.cloudinary.com/${cloudinaryEnv}/image/upload/${publicId}.${format}`;
@@ -362,7 +363,7 @@ async function getCloudinaryComponents(dateStr, photo, cloudinaryUrl) {
 
         if (!IMAGE_FORMATS.includes(format)) {
             const error = `Date ${dateStr}: Photo ${photo._id}: Cloudinary URL ${cloudinaryUrl} has invalid format: ${resource.format}!`
-            console.error(error);
+            log.error(error);
             throw new Error(error);
         }
     } else {
@@ -375,8 +376,8 @@ async function getCloudinaryComponents(dateStr, photo, cloudinaryUrl) {
 
 
 
-async function migrateToS3(downloadUrl, publicId, format) {
-    console.log(`Migrating ${downloadUrl} to S3 file ${publicId}_migrated.${format} (Bucket: ${UPLOADS_TRANSFORMED_BUCKET})...`)
+async function migrateToS3(dateStr, photo, downloadUrl, publicId, format) {
+    log.info(`Date ${dateStr}: Photo ${photo._id}: Migrating ${downloadUrl} to S3 file ${publicId}_migrated.${format} (Bucket: ${UPLOADS_TRANSFORMED_BUCKET})...`)
     return (
         await uploadStreamToS3({
             stream: (await axios.get(downloadUrl, { responseType: 'stream' })).data,

@@ -2,6 +2,7 @@ const throng = require('throng');
 const Queue = require("bull");
 const migration = require('./migrate_photos');
 const { redisOptions, WEB_CONCURRENCY } = require('./env_vars');
+const { log } = require('./log');
 
 
 // Spin up multiple processes to handle jobs to take advantage of more CPU cores
@@ -19,7 +20,7 @@ function start() {
   const workQueue = new Queue('work', redisOptions);
 
   workQueue.process(maxJobsPerWorker, async (job) => {
-    console.log("Running job for date", job.data.date);
+    log.info(`Date ${job.data.date}: Running job ${job} for date ${job.data.date}`);
     job.progress(0);
     return await migration.migratePhotosFromDate(job);
   });
