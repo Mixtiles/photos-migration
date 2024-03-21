@@ -14,9 +14,6 @@ const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID
 const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY
 const LOCAL = process.env.LOCAL ?? false
 
-const { log } = require('./log');
-log.info(`REDIS_URL: ${REDIS_URL}`)
-
 if (!PORT || !REDIS_URL || !WEB_CONCURRENCY || !MONGO_URL || !MONGO_DB_NAME || 
     !BATCH_SIZE || !DRY_RUN || !MAX_PHOTOS_PER_DAY || !UPLOADS_TRANSFORMED_BUCKET || 
     !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET || !CLOUDINARY_CLOUD_NAME || 
@@ -40,6 +37,7 @@ const redisOptions = {
 
 module.exports = {
     PORT,
+    REDIS_URL,
     WEB_CONCURRENCY,
     MONGO_URL,
     MONGO_DB_NAME,
