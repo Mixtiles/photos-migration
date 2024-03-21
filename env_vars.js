@@ -24,16 +24,14 @@ if (!PORT || !REDIS_URL || !WEB_CONCURRENCY || !MONGO_URL || !MONGO_DB_NAME ||
 
 const redisUri = new URL(REDIS_URL)
 const redisOptions = {
-    redis: {
-      port: Number(redisUri.port),
-      host: redisUri.hostname,
-      username: redisUri.username,
-      password: redisUri.password,
-      tls: redisUri.protocol === 'rediss:' && {
-        rejectUnauthorized: false,
-      }
+    port: Number(redisUri.port),
+    host: redisUri.hostname,
+    username: redisUri.username,
+    password: redisUri.password,
+    tls: redisUri.protocol === 'rediss:' && {
+    rejectUnauthorized: false,
     }
-  }
+}
 
 module.exports = {
     PORT,

@@ -9,7 +9,7 @@ const { log } = require('./log');
 const app = express();
 
 // Create / Connect to a named work queue
-const workQueue = new Queue('work', redisOptions);
+const workQueue = new Queue('work', { redis: redisOptions });
 
 // Serve the two static assets
 app.get('/', (req, res) => res.sendFile('index.html', { root: __dirname }));

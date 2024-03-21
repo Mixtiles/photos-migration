@@ -53,7 +53,7 @@ async function migratePhotosFromDate (job) {
         const db = mongoClient.db(MONGO_DB_NAME);
         log.info(`Date ${dateStr}: Connected successfully to Mongo server`);
 
-        log.info(`Date ${dateStr}: Connecting to Redis server ${redisOptions.host}:${redisOptions.port} (type of REDIS_URL: ${typeof REDIS_URL}, beginning: ${REDIS_URL.slice(0, 10)})...`);
+        log.info(`Date ${dateStr}: Connecting to Redis server...`);
         await redisClient.connect();
         log.info(`Date ${dateStr}: Connected successfully to Redis server`);
         wasLocked = await redisClient.setNX(`lock:${dateStr}`, job.id);

@@ -17,7 +17,7 @@ const maxJobsPerWorker = 50;
 function start() {
 
   // Connect to the named work queue
-  const workQueue = new Queue('work', redisOptions);
+  const workQueue = new Queue('work', { redis: redisOptions });
 
   workQueue.process(maxJobsPerWorker, async (job) => {
     log.info(`Date ${job.data.date}: Running job ${job.id} for date ${job.data.date}`);
