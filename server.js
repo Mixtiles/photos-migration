@@ -1,11 +1,10 @@
 const express = require('express');
 const Queue = require('bull');
-const { redisOptions, PORT, REDIS_URL } = require('./env_vars');
+const { redisOptions, PORT } = require('./env_vars');
 const { log } = require('./log');
 
 // Serve on PORT on Heroku and on localhost:5000 locally
 // Connect to a local redis intance locally, and the Heroku-provided URL in production
-log.info(`REDIS_URL: ${REDIS_URL}`)
 
 const app = express();
 
