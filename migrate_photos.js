@@ -6,6 +6,7 @@ const { createClient } = require('redis');
 const { log } = require('./log');
 
 const {
+    REDIS_URL,
     MONGO_URL,
     MONGO_DB_NAME,
     BATCH_SIZE,
@@ -52,7 +53,7 @@ async function migratePhotosFromDate (job) {
         const db = mongoClient.db(MONGO_DB_NAME);
         log.info(`Date ${dateStr}: Connected successfully to Mongo server`);
 
-        log.info(`Date ${dateStr}: Connecting to Redis server ${redisOptions.host}:${redisOptions.port}...`);
+        log.info(`Date ${dateStr}: Connecting to Redis server ${redisOptions.host}:${redisOptions.port} (type of REDIS_URL: ${typeof REDIS_URL})...`);
         await redisClient.connect();
         log.info(`Date ${dateStr}: Connected successfully to Redis server`);
         wasLocked = await redisClient.setNX(`lock:${dateStr}`, job.id);
