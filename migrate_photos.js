@@ -4,6 +4,7 @@ const { uploadStreamToS3 } = require('./common');
 const axios = require('axios');
 const { createClient } = require('redis');
 const { log } = require('./log');
+const { getFilestackHandleIdToPath } = require('./filestack');
 
 const {
     REDIS_URL,
@@ -13,6 +14,7 @@ const {
     DRY_RUN,
     MAX_PHOTOS_PER_DAY,
     UPLOADS_TRANSFORMED_BUCKET,
+    FILESTACK_BUCKET,
     CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET,
     CLOUDINARY_CLOUD_NAME,
@@ -69,7 +71,7 @@ async function migratePhotosFromDate (job) {
         let numPhotosMigrated = 0;
         for (let i = 0; i < photos.length; i += BATCH_SIZE) {
             const batch = photos.slice(i, i + BATCH_SIZE);
-            const results = await Promise.all(batch.map(photo => migratePhoto(dateStr, photo, db)));
+            const results = await Promise.all(batch.map(photo => migratePhoto(dateStr, photo, db, job)));
             results.forEach(result => { numPhotosMigrated += result });
             job.progress((Math.min(i + BATCH_SIZE, photos.length)) / photos.length * 100);
 
@@ -135,7 +137,7 @@ async function getPhotos(dateStr, db) {
     ).limit(MAX_PHOTOS_PER_DAY).toArray()
 }
 
-async function migratePhoto(dateStr, photo, db) {
+async function migratePhoto(dateStr, photo, db, job) {
     try {
 
         log.info(`Date ${dateStr}: Photo ${photo._id}: Start migrating...`);
@@ -251,11 +253,11 @@ async function migratePhoto(dateStr, photo, db) {
             log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl is an SVG. Copying cache jigVersion and previewThumbnail directly.`);
             let { publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.jigVersion);
             let downloadUrl = photo.jigVersion
-            after.jigVersion = await migrateToS3(dateStr, photo, downloadUrl, publicId + '_jig', format);
+            after.jigVersion = await migrateToS3(dateStr, photo, downloadUrl, publicId + '_jig', format, UPLOADS_TRANSFORMED_BUCKET);
             migratedFiles.push({from: downloadUrl, to: after.jigVersion, fromFormat: format, fromPublicId: publicId});
             ({ publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.previewThumbnail));
             downloadUrl = photo.previewThumbnail
-            after.previewThumbnail = await migrateToS3(dateStr, photo, downloadUrl, publicId + '_preview_thumbnail', format);
+            after.previewThumbnail = await migrateToS3(dateStr, photo, downloadUrl, publicId + '_preview_thumbnail', format, UPLOADS_TRANSFORMED_BUCKET);
             migratedFiles.push({from: downloadUrl, to: after.previewThumbnail, fromFormat: format, fromPublicId: publicId});
         } else {
             log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl is not an SVG. No special handling needed.`);
@@ -273,10 +275,49 @@ async function migratePhoto(dateStr, photo, db) {
 
         let s3Url
         if (photoUrlBaseFileName != jigVersionBaseFileName || photo.url.match(/cloudinary/)) {
+            log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl basename is different than jigVersion basename, or url is a Cloudinary url. Migrating from Cloudinary.`);
             const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.fullsize)
-            s3Url = await migrateToS3(dateStr, photo, downloadUrl, publicId, format)
+            s3Url = await migrateToS3(dateStr, photo, downloadUrl, publicId, format, UPLOADS_TRANSFORMED_BUCKET)
             migratedFiles.push({from: downloadUrl, to: s3Url, fromFormat: format, fromPublicId: publicId});
+        } else if (photo.url.match(/filestack/)) {
+            log.info(`Date ${dateStr}: Photo ${photo._id}: url is a Filestack url.`);
+            const { handleId, downloadUrl, publicId, format } = await getFilestackComponents(dateStr, photo, photo.url, photo.photoUrl)
+            const filestackHandleIdToPath = await getFilestackHandleIdToPath()
+            const path = filestackHandleIdToPath[handleId]
+            const s3Path = `https://${FILESTACK_BUCKET}.s3.amazonaws.com${path}`
+            const statusCode = path && (await axios.head(s3Path, { validateStatus: false })).status
+            if (statusCode == 200) {
+                log.info(`Date ${dateStr}: Photo ${photo._id}: url is a Filestack url that exists on S3 bucket, using the existing path.`);
+                s3Url = s3Path
+            } else {
+                log.info(`Date ${dateStr}: Photo ${photo._id}: url is a Filestack url that doesn't exists S3 bucket (s3Path=${s3Path}, statusCode=${statusCode}), migrating.`);
+                s3Url = await migrateToS3(dateStr, photo, downloadUrl, `migrated/${handleId}_${publicId}`, format, FILESTACK_BUCKET)
+                migratedFiles.push({from: downloadUrl, to: s3Url, fromFormat: format, fromPublicId: publicId});
+                const insertLogFilestackResult = await db.collection('PhotoMigrationLogFilestack').insertOne(
+                    { 
+                        _created_at: new Date(),
+                        jobId: job.id,
+                        date: dateStr,
+                        photo_id: photo._id,
+                        photo_created_at: photo._created_at,
+                        handleId,
+                        publicId,
+                        downloadUrl,
+                        format,
+                        filestackUrl: photo.url,
+                        s3Url
+                    }
+                )
+                if (!insertLogFilestackResult.acknowledged || !insertLogFilestackResult.insertedId) {
+                    const error = `Date ${dateStr}: Photo ${photo._id}: Failed to insert migration filestack log! insertLogFilestackResult=${JSON.stringify(insertLogFilestackResult)}!`
+                    log.error(error);
+                    throw new Error(error);
+                }
+            }
+            after.url = s3Url
+            after.photoUrl = s3Url
         } else {
+            log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl basename is the same as jigVersion basename, or url not in Cloudinary / Filestack. Using url as is.`);
             // s3Url here means non-Cloudinary. Almost always it's S3, but it still could be in other domains (filestck.com, etc.)
             s3Url = photo.url
         }
@@ -287,7 +328,9 @@ async function migratePhoto(dateStr, photo, db) {
         if (!after.previewThumbnail) {
             after.previewThumbnail = transformToFetchUrl(photo.previewThumbnail, s3Url);
         }
-        after.photoUrl = photo.url
+        if (!after.photoUrl) {
+            after.photoUrl = photo.url
+        }
         after.bigThumb = transformToFetchUrl(photo.bigThumb, s3Url);
         after.fullsize = transformToFetchUrl(photo.fullsize, s3Url);
         after.mediumThumb = transformToFetchUrl(photo.mediumThumb, s3Url);
@@ -303,6 +346,7 @@ async function migratePhoto(dateStr, photo, db) {
             const updateLogResult = await db.collection('PhotoMigrationLog').insertOne(
                 { 
                     _created_at: new Date(),
+                    jobId: job.id,
                     date: dateStr,
                     photo_id: photo._id,
                     photo_created_at: photo._created_at,
@@ -389,15 +433,26 @@ async function getCloudinaryComponents(dateStr, photo, cloudinaryUrl) {
     return { downloadUrl, publicId, format }
 }
 
+async function getFilestackComponents(dateStr, photo, filestackUrl, cloudinaryUrl) {
+    const handleId = filestackUrl.match(/^https:\/\/cdn\.filestackcontent\.com\/([^\/]+)$/)?.[1]
+    if (!handleId) {
+        const error = `Date ${dateStr}: Photo ${photo._id}: Filestack URL ${filestackUrl} could not be parsed!`
+        log.error(error);
+        throw new Error(error);
+    }
 
+    const cloudinaryComponents = await getCloudinaryComponents(dateStr, photo, cloudinaryUrl)
 
-async function migrateToS3(dateStr, photo, downloadUrl, publicId, format) {
-    log.info(`Date ${dateStr}: Photo ${photo._id}: Migrating ${downloadUrl} to S3 file ${publicId}_migrated.${format} (Bucket: ${UPLOADS_TRANSFORMED_BUCKET})...`)
+    return { handleId, ...cloudinaryComponents }
+}
+
+async function migrateToS3(dateStr, photo, downloadUrl, publicId, format, bucketName) {
+    log.info(`Date ${dateStr}: Photo ${photo._id}: Migrating ${downloadUrl} to S3 file ${publicId}_migrated.${format} (Bucket: ${bucketName})...`)
     return (
         await uploadStreamToS3({
             stream: (await axios.get(downloadUrl, { responseType: 'stream' })).data,
             filename: `${publicId}_migrated.${format}`,
-            bucketName: UPLOADS_TRANSFORMED_BUCKET,
+            bucketName: bucketName,
         })
     ).url
 }

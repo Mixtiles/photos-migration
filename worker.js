@@ -3,7 +3,7 @@ const Queue = require("bull");
 const migration = require('./migrate_photos');
 const { redisOptions, WEB_CONCURRENCY } = require('./env_vars');
 const { log } = require('./log');
-
+const { getFilestackHandleIdToPath } = require('./filestack');
 
 // Spin up multiple processes to handle jobs to take advantage of more CPU cores
 // See: https://devcenter.heroku.com/articles/node-concurrency for more info
@@ -13,6 +13,8 @@ const { log } = require('./log');
 // responses it can be much higher. If each job is CPU-intensive, it might need
 // to be much lower.
 const maxJobsPerWorker = 50;
+
+getFilestackHandleIdToPath();
 
 function start() {
 
