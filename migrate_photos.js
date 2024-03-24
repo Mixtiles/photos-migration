@@ -274,12 +274,7 @@ async function migratePhoto(dateStr, photo, db, job) {
         }
 
         let s3Url
-        if (photoUrlBaseFileName != jigVersionBaseFileName || photo.url.match(/cloudinary/)) {
-            log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl basename is different than jigVersion basename, or url is a Cloudinary url. Migrating from Cloudinary.`);
-            const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.fullsize)
-            s3Url = await migrateToS3(dateStr, photo, downloadUrl, publicId, format, UPLOADS_TRANSFORMED_BUCKET)
-            migratedFiles.push({from: downloadUrl, to: s3Url, fromFormat: format, fromPublicId: publicId});
-        } else if (photo.url.match(/filestack/)) {
+        if (photo.url.match(/filestack/)) {
             log.info(`Date ${dateStr}: Photo ${photo._id}: url is a Filestack url.`);
             const { handleId, downloadUrl, publicId, format } = await getFilestackComponents(dateStr, photo, photo.url, photo.photoUrl)
             const filestackHandleIdToPath = await getFilestackHandleIdToPath()
@@ -316,10 +311,17 @@ async function migratePhoto(dateStr, photo, db, job) {
             }
             after.url = s3Url
             after.photoUrl = s3Url
+        }
+
+        if (photoUrlBaseFileName != jigVersionBaseFileName || photo.url.match(/cloudinary/)) {
+            log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl basename is different than jigVersion basename, or url is a Cloudinary url. Migrating from Cloudinary.`);
+            const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.fullsize)
+            s3Url = await migrateToS3(dateStr, photo, downloadUrl, publicId, format, UPLOADS_TRANSFORMED_BUCKET)
+            migratedFiles.push({from: downloadUrl, to: s3Url, fromFormat: format, fromPublicId: publicId});
         } else {
-            log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl basename is the same as jigVersion basename, or url not in Cloudinary / Filestack. Using url as is.`);
+            log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl basename is the same as jigVersion basename, and url is not a Cloudinary url. Using url as is.`);
             // s3Url here means non-Cloudinary. Almost always it's S3, but it still could be in other domains (filestck.com, etc.)
-            s3Url = photo.url
+            s3Url = s3Url ?? photo.url
         }
 
         if (!after.jigVersion) {
