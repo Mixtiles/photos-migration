@@ -72,6 +72,12 @@ async function migratePhotosFromDate (job) {
             const results = await Promise.all(batch.map(photo => migratePhoto(dateStr, photo, db)));
             results.forEach(result => { numPhotosMigrated += result });
             job.progress((Math.min(i + BATCH_SIZE, photos.length)) / photos.length * 100);
+
+            const shouldStop = await redisClient.get(`stop:${dateStr}`)
+            if (shouldStop) {
+                log.info(`Date ${dateStr}: Stopping job...`);
+                return { status: 'Stopped', numPhotosQueried: photos.length, numPhotosMigrated};
+            }
         }
         
         return { status: 'Success', numPhotosQueried: photos.length, numPhotosMigrated};

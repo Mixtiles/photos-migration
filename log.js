@@ -1,6 +1,5 @@
 const winston = require('winston')
 const { mapValues, pickBy, isEmpty } = require('lodash')
-const util = require('util')
 const { LOCAL } = require('./env_vars')
 
 
@@ -36,11 +35,8 @@ function printfPrettyJSON() {
     const argsObject = JSON.parse(JSON.stringify(args))
 
     const levelString = winston.format.colorize().colorize(level, level.toUpperCase())
-    const argsString = isEmpty(argsObject)
-      ? ``
-      : `\n${util.inspect(argsObject, { showHidden: false, compact: true, colors: true, breakLength: 200 })}`
 
-    return `${levelString} ${message}${argsString}`
+    return `${levelString} ${message}`
   })
 }
 
