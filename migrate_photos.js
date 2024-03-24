@@ -247,13 +247,18 @@ async function migratePhoto(dateStr, photo, db) {
             throw new Error(error);
         }
 
-        if (jigVersionFileName.endsWith('.pdf')) {
-            log.info(`Date ${dateStr}: Photo ${photo._id}: jigVersion is a PDF.`);
-            const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.jigVersion);
-            after.jigVersion = await migrateToS3(dateStr, photo, downloadUrl, publicId, format);
+        if (photoUrlFileName.endsWith('.svg')) {
+            log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl is an SVG. Copying cache jigVersion and previewThumbnail directly.`);
+            let { publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.jigVersion);
+            let downloadUrl = photo.jigVersion
+            after.jigVersion = await migrateToS3(dateStr, photo, downloadUrl, publicId + '_jig', format);
             migratedFiles.push({from: downloadUrl, to: after.jigVersion, fromFormat: format, fromPublicId: publicId});
+            ({ publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.previewThumbnail));
+            downloadUrl = photo.previewThumbnail
+            after.previewThumbnail = await migrateToS3(dateStr, photo, downloadUrl, publicId + '_preview_thumbnail', format);
+            migratedFiles.push({from: downloadUrl, to: after.previewThumbnail, fromFormat: format, fromPublicId: publicId});
         } else {
-            log.info(`Date ${dateStr}: Photo ${photo._id}: jigVersion is an image.`);
+            log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl is not an SVG. No special handling needed.`);
             if (!jigVersionFileName == photoUrlFileName) {
                 const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, non-PDF jigVersion is not same Cloudinary upload!`
                 log.error(error);
@@ -279,11 +284,13 @@ async function migratePhoto(dateStr, photo, db) {
         if (!after.jigVersion) {
             after.jigVersion = transformToFetchUrl(photo.jigVersion, s3Url);
         }
+        if (!after.previewThumbnail) {
+            after.previewThumbnail = transformToFetchUrl(photo.previewThumbnail, s3Url);
+        }
         after.photoUrl = photo.url
         after.bigThumb = transformToFetchUrl(photo.bigThumb, s3Url);
         after.fullsize = transformToFetchUrl(photo.fullsize, s3Url);
         after.mediumThumb = transformToFetchUrl(photo.mediumThumb, s3Url);
-        after.previewThumbnail = transformToFetchUrl(photo.previewThumbnail, s3Url);
         after.smallThumb = transformToFetchUrl(photo.smallThumb, s3Url);
 
         if (DRY_RUN != 'false') {
