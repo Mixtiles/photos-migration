@@ -9,7 +9,11 @@ const { log } = require('./log');
 const app = express();
 
 // Create / Connect to a named work queue
-const workQueue = new Queue('work', { redis: redisOptions });
+const workQueue = new Queue('work', { 
+  redis: redisOptions,
+  // If a worker doesn't report every 5 minutes, it is considered dead
+  settings: { stalledInterval: 5*60*100 }
+});
 
 // Serve the two static assets
 app.get('/', (req, res) => res.sendFile('index.html', { root: __dirname }));

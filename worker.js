@@ -19,7 +19,11 @@ getFilestackHandleIdToPath();
 function start() {
 
   // Connect to the named work queue
-  const workQueue = new Queue('work', { redis: redisOptions });
+  const workQueue = new Queue('work', { 
+    redis: redisOptions,
+    // If a worker doesn't report every 5 minutes, it is considered dead
+    settings: { stalledInterval: 5*60*100 }
+  });
 
   workQueue.process(maxJobsPerWorker, async (job) => {
     log.info(`Date ${job.data.date}: Running job ${job.id} for date ${job.data.date}`);
