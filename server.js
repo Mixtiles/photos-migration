@@ -11,9 +11,15 @@ const app = express();
 // Create / Connect to a named work queue
 const workQueue = new Queue('work', { 
   redis: redisOptions,
-  // If a worker doesn't report every 5 minutes, it is considered dead
-  settings: { stalledInterval: 5*60*100 }
+  settings: { 
+    // If a worker doesn't report every 15 minutes, it is considered dead
+    stalledInterval: 15*60*100,
+    maxStalledCount: 100,
+    // Sometimes it takes it more than 5 minutes - so we just skip that test
+    skipStalledCheck: false,
+  }
 });
+
 
 // Serve the two static assets
 app.get('/', (req, res) => res.sendFile('index.html', { root: __dirname }));

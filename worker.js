@@ -21,8 +21,13 @@ function start() {
   // Connect to the named work queue
   const workQueue = new Queue('work', { 
     redis: redisOptions,
-    // If a worker doesn't report every 5 minutes, it is considered dead
-    settings: { stalledInterval: 5*60*100 }
+    settings: { 
+      // If a worker doesn't report every 15 minutes, it is considered dead
+      stalledInterval: 15*60*100,
+      maxStalledCount: 100,
+      // Sometimes it takes it more than 5 minutes - so we just skip that test
+      skipStalledCheck: false,
+    }
   });
 
   workQueue.process(maxJobsPerWorker, async (job) => {
