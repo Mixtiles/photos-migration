@@ -60,9 +60,11 @@ async function migratePhotosFromDate (job) {
         wasLocked = await redisClient.setNX(`lock:${dateStr}`, job.id);
         if (!wasLocked) {
             lockingJobId = await redisClient.get(`lock:${dateStr}`);
-            const error = `Date ${dateStr}: Already locked by job id ${lockingJobId}!`
-            log.error(error);
-            throw new Error(error);
+            if (lockingJobId != job.id) {
+                const error = `Date ${dateStr}: Already locked by job id ${lockingJobId}!`
+                log.error(error);
+                throw new Error(error);
+            }
         }
 
         const photos = await getPhotos(dateStr, db);
