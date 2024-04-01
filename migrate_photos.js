@@ -384,6 +384,7 @@ async function migratePhoto(dateStr, photo, db, job) {
             await db.collection('PhotoMigrationLog').insertOne(
                 { 
                     _created_at: new Date(),
+                    jobId: job.id,
                     date: dateStr,
                     photo_id: photo._id,
                     photo_created_at: photo._created_at,
