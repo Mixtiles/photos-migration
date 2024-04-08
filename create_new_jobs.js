@@ -36,7 +36,7 @@ const workQueue = new Queue('work', {
 async function getLastDate() {
     let lastDate = new Date();
     const keys = await redisClient.keys("bull:work:*")
-    for (let key of keys) {
+    for (const key of keys) {
         if (key.match(/bull:work:(\d)+/)) {
             const dateStr = JSON.parse(await redisClient.hGet(key, "data"))["date"]
             const date = new Date(dateStr);
@@ -52,20 +52,20 @@ async function runNewJobs() {
     await redisClient.connect();
     numActiveJobs = await redisClient.lLen(`bull:work:active`);
 
-    log.info(`Number of active jobs: ${numActiveJobs}`);
+    log.info(`Create New Jobs - Number of active jobs: ${numActiveJobs}`);
     if (numActiveJobs >= MAX_ACTIVE_JOBS) {
-        log.info(`There are enough active jobs (${numActiveJobs}), more then the maximum (${MAX_ACTIVE_JOBS}). Skipping...`)
+        log.info(`Create New Jobs - There are enough active jobs (${numActiveJobs}), more then the maximum (${MAX_ACTIVE_JOBS}). Skipping...`)
         return;
     } else {
-        log.info(`Going to create ${MAX_ACTIVE_JOBS - numActiveJobs} new jobs...`)
+        log.info(`Create New Jobs - Going to create ${MAX_ACTIVE_JOBS - numActiveJobs} new jobs...`)
     }
 
     lastDate = await getLastDate();
-    log.info(`Last date: ${lastDate}`);
+    log.info(`Create New Jobs - Last date: ${lastDate}`);
     const previousDays = getPreviousDays(lastDate, MAX_ACTIVE_JOBS - numActiveJobs);
     for (const date of previousDays) {
-        log.info(`Running job for ${date}`);
-        await workQueue.add(
+        log.info(`Create New Jobs - Running job for ${date}`);
+        const job = await workQueue.add(
             {
               date: date,
             }, 
@@ -73,6 +73,7 @@ async function runNewJobs() {
               attempts: 1 // This tells Bull to attempt the job only once, with no retries after failure
             }
         );
+        log.info(`Create New Jobs - Job ${job.id} created for date ${date}`);
     }
     process.exit(0);
   }
