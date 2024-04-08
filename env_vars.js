@@ -14,11 +14,12 @@ const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
 const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID
 const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY
 const LOCAL = process.env.LOCAL ?? false
+const MAX_ACTIVE_JOBS = parseInt(process.env.MAX_ACTIVE_JOBS)
 
 if (!PORT || !REDIS_URL || !WEB_CONCURRENCY || !MONGO_URL || !MONGO_DB_NAME || 
     !BATCH_SIZE || !DRY_RUN || !MAX_PHOTOS_PER_DAY || !UPLOADS_TRANSFORMED_BUCKET || 
     !FILESTACK_BUCKET || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET || !CLOUDINARY_CLOUD_NAME || 
-    !AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY
+    !AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !MAX_ACTIVE_JOBS
 ) {
     throw new Error('One or more environment variables are missing!')
 }
@@ -49,5 +50,6 @@ module.exports = {
     CLOUDINARY_API_SECRET,
     CLOUDINARY_CLOUD_NAME,
     LOCAL,
+    MAX_ACTIVE_JOBS,
     redisOptions
 }
