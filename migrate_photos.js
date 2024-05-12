@@ -121,6 +121,12 @@ async function getPhotos(dateStr, db) {
             ],
             fullsize: {
                 '$ne': 'https://res.cloudinary.com/mixtiles/image/upload/v1527783983/300x300_bgqc68.png'
+            },
+            jigVersion: { 
+                $not: /^(https?:\/\/res.cloudinary.com\/mixtiles\/image\/fetch)/ 
+            },
+            photoUrl: {
+                $exists: true
             }
         }
     ).project(
@@ -144,11 +150,6 @@ async function migratePhoto(dateStr, photo, db, job) {
 
         log.info(`Date ${dateStr}: Photo ${photo._id}: Start migrating...`);
 
-        if (!photo.jigVersion) {
-            log.info(`Date ${dateStr}: Photo ${photo._id}: No jigVersion, skipping...`);
-            return 0;
-        }
-
         const before = {
             url: photo.url,
             jigVersion: photo.jigVersion,
@@ -163,23 +164,23 @@ async function migratePhoto(dateStr, photo, db, job) {
         const migratedFiles = []
 
         if (
-            !photo.jigVersion.match(/res.cloudinary.com.*\/(upload|private)\//) ||
-            !photo.photoUrl.match(/res.cloudinary.com.*\/upload\//) ||
-            !photo.bigThumb.match(/res.cloudinary.com.*\/upload\//) ||
-            !photo.fullsize.match(/res.cloudinary.com.*\/upload\//) ||
-            !photo.mediumThumb.match(/res.cloudinary.com.*\/upload\//) ||
-            !photo.previewThumbnail.match(/res.cloudinary.com.*\/upload\//) ||
-            !photo.smallThumb.match(/res.cloudinary.com.*\/upload\//)
+            (photo.jigVersion != undefined && !photo.jigVersion.match(/res.cloudinary.com.*\/(upload|private)\//)) ||
+            (photo.bigThumb != undefined && !photo.bigThumb.match(/res.cloudinary.com.*\/upload\//)) ||
+            (photo.fullsize != undefined && !photo.fullsize.match(/res.cloudinary.com.*\/upload\//)) ||
+            (photo.mediumThumb != undefined && !photo.mediumThumb.match(/res.cloudinary.com.*\/upload\//)) ||
+            (photo.previewThumbnail != undefined && !photo.previewThumbnail.match(/res.cloudinary.com.*\/upload\//)) ||
+            (photo.smallThumb != undefined && !photo.smallThumb.match(/res.cloudinary.com.*\/upload\//)) ||
+            (!photo.photoUrl.match(/res.cloudinary.com.*\/upload\//))
         ) {
             if (
-                photo.jigVersion.match(/res.cloudinary.com.*\/fetch\//) &&
-                photo.bigThumb.match(/res.cloudinary.com.*\/fetch\//) &&
-                photo.fullsize.match(/res.cloudinary.com.*\/fetch\//) &&
-                photo.mediumThumb.match(/res.cloudinary.com.*\/fetch\//) &&
-                photo.previewThumbnail.match(/res.cloudinary.com.*\/fetch\//) &&
-                photo.smallThumb.match(/res.cloudinary.com.*\/fetch\//) &&
-                photo.photoUrl.match(/res.cloudinary.com.*\/upload\//) &&
-                photo.photoUrl.match(ALLOWED_CLOUDINARY_UPLOADS)
+                (photo.jigVersion == undefined || photo.jigVersion.match(/res.cloudinary.com.*\/fetch\//)) &&
+                (photo.bigThumb == undefined || photo.bigThumb.match(/res.cloudinary.com.*\/fetch\//)) &&
+                (photo.fullsize == undefined || photo.fullsize.match(/res.cloudinary.com.*\/fetch\//)) &&
+                (photo.mediumThumb == undefined || photo.mediumThumb.match(/res.cloudinary.com.*\/fetch\//)) &&
+                (photo.previewThumbnail == undefined || photo.previewThumbnail.match(/res.cloudinary.com.*\/fetch\//)) &&
+                (photo.smallThumb == undefined || photo.smallThumb.match(/res.cloudinary.com.*\/fetch\//)) &&
+                (photo.photoUrl.match(/res.cloudinary.com.*\/upload\//)) &&
+                (photo.photoUrl.match(ALLOWED_CLOUDINARY_UPLOADS))
             ) {
                 log.info(`Date ${dateStr}: Photo ${photo._id}: only photoUrl is Cloudinary upload, of an allowed type (meaning already migrated), skipping...`);
                 return 0;    
@@ -190,61 +191,61 @@ async function migratePhoto(dateStr, photo, db, job) {
             }
         }
         if (
-            (photo.jigVersion.match(/\/(upload|private)\//g) || []).length != 1 ||
-            (photo.photoUrl.match(/\/upload\//g) || []).length != 1 ||
-            (photo.bigThumb.match(/\/upload\//g) || []).length != 1 ||
-            (photo.fullsize.match(/\/upload\//g) || []).length != 1 ||
-            (photo.mediumThumb.match(/\/upload\//g) || []).length != 1 ||
-            (photo.previewThumbnail.match(/\/upload\//g) || []).length != 1 ||
-            (photo.smallThumb.match(/\/upload\//g) || []).length != 1
+            (photo.jigVersion != undefined && (photo.jigVersion.match(/\/(upload|private)\//g) || []).length != 1) ||
+            (photo.bigThumb != undefined && (photo.bigThumb.match(/\/upload\//g) || []).length != 1) ||
+            (photo.fullsize != undefined && (photo.fullsize.match(/\/upload\//g) || []).length != 1) ||
+            (photo.mediumThumb != undefined && (photo.mediumThumb.match(/\/upload\//g) || []).length != 1) ||
+            (photo.previewThumbnail != undefined && (photo.previewThumbnail.match(/\/upload\//g) || []).length != 1) ||
+            (photo.smallThumb != undefined && (photo.smallThumb.match(/\/upload\//g) || []).length != 1) ||
+            ((photo.photoUrl.match(/\/upload\//g) || []).length != 1)
         ) {
             const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, not all 7 photos have exactly 1 aprearance of /upload/ in their URL!`
             log.error(error);
             throw new Error(error);
         }
         if (
-            (photo.jigVersion.match(/\/fetch\//g) || []).length != 0 ||
-            (photo.photoUrl.match(/\/fetch\//g) || []).length != 0 ||
-            (photo.bigThumb.match(/\/fetch\//g) || []).length != 0 ||
-            (photo.fullsize.match(/\/fetch\//g) || []).length != 0 ||
-            (photo.mediumThumb.match(/\/fetch\//g) || []).length != 0 ||
-            (photo.previewThumbnail.match(/\/fetch\//g) || []).length != 0 ||
-            (photo.smallThumb.match(/\/fetch\//g) || []).length != 0
+            (photo.jigVersion != undefined && (photo.jigVersion.match(/\/fetch\//g) || []).length != 0) ||
+            (photo.bigThumb != undefined && (photo.bigThumb.match(/\/fetch\//g) || []).length != 0) ||
+            (photo.fullsize != undefined && (photo.fullsize.match(/\/fetch\//g) || []).length != 0) ||
+            (photo.mediumThumb != undefined && (photo.mediumThumb.match(/\/fetch\//g) || []).length != 0) ||
+            (photo.previewThumbnail != undefined && (photo.previewThumbnail.match(/\/fetch\//g) || []).length != 0) ||
+            (photo.smallThumb != undefined && (photo.smallThumb.match(/\/fetch\//g) || []).length != 0) ||
+            ((photo.photoUrl.match(/\/fetch\//g) || []).length != 0)
         ) {
             const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, not all 7 photos have exactly 0 aprearance of /fetch/ in their URL!`
             log.error(error);
             throw new Error(error);
         }
 
-        const jigVersionFileName = photo.jigVersion.split('/').pop();
+        const jigVersionFileName = photo.jigVersion?.split('/')?.pop();
+        const bigThumbFileName = photo.bigThumb?.split('/')?.pop();
+        const fullsizeFileName = photo.fullsize?.split('/')?.pop();
+        const mediumThumbFileName = photo.mediumThumb?.split('/')?.pop();
+        const previewThumbnailFileName = photo.previewThumbnail?.split('/')?.pop();
+        const smallThumbFileName = photo.smallThumb?.split('/')?.pop();
         const photoUrlFileName = photo.photoUrl.split('/').pop();
-        const bigThumbFileName = photo.bigThumb.split('/').pop();
-        const fullsizeFileName = photo.fullsize.split('/').pop();
-        const mediumThumbFileName = photo.mediumThumb.split('/').pop();
-        const previewThumbnailFileName = photo.previewThumbnail.split('/').pop();
-        const smallThumbFileName = photo.smallThumb.split('/').pop();
 
-        const jigVersionBaseFileName = jigVersionFileName.split('.')[0]
+        const jigVersionBaseFileName = jigVersionFileName?.split('.')?.[0]
         const photoUrlBaseFileName = photoUrlFileName.split('.')[0]
 
         if (
-            !bigThumbFileName == photoUrlFileName ||
-            !fullsizeFileName == photoUrlFileName ||
-            !mediumThumbFileName == photoUrlFileName ||
-            !previewThumbnailFileName == photoUrlFileName ||
-            !smallThumbFileName == photoUrlFileName
+            (bigThumbFileName != undefined && (bigThumbFileName != photoUrlFileName)) ||
+            (fullsizeFileName != undefined && (fullsizeFileName != photoUrlFileName)) ||
+            (mediumThumbFileName != undefined && (mediumThumbFileName != photoUrlFileName)) ||
+            (previewThumbnailFileName != undefined && (previewThumbnailFileName != photoUrlFileName)) ||
+            (smallThumbFileName != undefined && (smallThumbFileName != photoUrlFileName))
         ) {
             const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, not all 6 photos are the same Cloudinary upload!`
             log.error(error);
             throw new Error(error);
         }
         if (
-            !photo.photoUrl.match(/res.cloudinary.com.*\/image\/upload\//) ||
-            !photo.bigThumb.match(/res.cloudinary.com.*\/image\/upload\//) ||
-            !photo.fullsize.match(/res.cloudinary.com.*\/image\/upload\//) ||
-            !photo.mediumThumb.match(/res.cloudinary.com.*\/image\/upload\//) ||
-            !photo.previewThumbnail.match(/res.cloudinary.com.*\/image\/upload\//) ||
-            !photo.smallThumb.match(/res.cloudinary.com.*\/image\/upload\//)
+            (photo.bigThumb != undefined && !photo.bigThumb.match(/res.cloudinary.com.*\/image\/upload\//)) ||
+            (photo.fullsize != undefined && !photo.fullsize.match(/res.cloudinary.com.*\/image\/upload\//)) ||
+            (photo.mediumThumb != undefined && !photo.mediumThumb.match(/res.cloudinary.com.*\/image\/upload\//)) ||
+            (photo.previewThumbnail != undefined && !photo.previewThumbnail.match(/res.cloudinary.com.*\/image\/upload\//)) ||
+            (photo.smallThumb != undefined && !photo.smallThumb.match(/res.cloudinary.com.*\/image\/upload\//)) ||
+            (!photo.photoUrl.match(/res.cloudinary.com.*\/image\/upload\//))
         ) {
             const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, not all 6 photos include /image/upload/ in their URL!`
             log.error(error);
@@ -253,22 +254,27 @@ async function migratePhoto(dateStr, photo, db, job) {
 
         if (photoUrlFileName.endsWith('.svg')) {
             log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl is an SVG. Copying cache jigVersion and previewThumbnail directly.`);
-            let { publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.jigVersion);
-            let downloadUrl = photo.jigVersion
-            after.jigVersion = await migrateToS3(dateStr, photo, downloadUrl, publicId + '_jig', format, UPLOADS_TRANSFORMED_BUCKET);
-            migratedFiles.push({from: downloadUrl, to: after.jigVersion, fromFormat: format, fromPublicId: publicId});
-            ({ publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.previewThumbnail));
-            downloadUrl = photo.previewThumbnail
-            after.previewThumbnail = await migrateToS3(dateStr, photo, downloadUrl, publicId + '_preview_thumbnail', format, UPLOADS_TRANSFORMED_BUCKET);
-            migratedFiles.push({from: downloadUrl, to: after.previewThumbnail, fromFormat: format, fromPublicId: publicId});
+            let publicId, format, downloadUrl;
+            if (photo.jigVersion) {
+                ({ publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.jigVersion));
+                downloadUrl = photo.jigVersion
+                after.jigVersion = await migrateToS3(dateStr, photo, downloadUrl, publicId + '_jig', format, UPLOADS_TRANSFORMED_BUCKET);
+                migratedFiles.push({from: downloadUrl, to: after.jigVersion, fromFormat: format, fromPublicId: publicId});
+            }
+            if (photo.previewThumbnail) {
+                ({ publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.previewThumbnail));
+                downloadUrl = photo.previewThumbnail
+                after.previewThumbnail = await migrateToS3(dateStr, photo, downloadUrl, publicId + '_preview_thumbnail', format, UPLOADS_TRANSFORMED_BUCKET);
+                migratedFiles.push({from: downloadUrl, to: after.previewThumbnail, fromFormat: format, fromPublicId: publicId});    
+            }
         } else {
             log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl is not an SVG. No special handling needed.`);
-            if (!jigVersionFileName == photoUrlFileName) {
+            if (jigVersionFileName != undefined && !jigVersionFileName == photoUrlFileName) {
                 const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, non-PDF jigVersion is not same Cloudinary upload!`
                 log.error(error);
                 throw new Error(error);
             }
-            if (!photo.jigVersion.match(/res.cloudinary.com.*\/image\/upload\//)) {
+            if (jigVersionFileName != undefined && !photo.jigVersion.match(/res.cloudinary.com.*\/image\/upload\//)) {
                 const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, non-PDF jigVersion doesn't include /image/upload/ in its URL!`
                 log.error(error);
                 throw new Error(error);
@@ -276,7 +282,7 @@ async function migratePhoto(dateStr, photo, db, job) {
         }
 
         let s3Url
-        if (photo.url.match(/filestack/)) {
+        if (photo.url && photo.url.match(/filestack/)) {
             log.info(`Date ${dateStr}: Photo ${photo._id}: url is a Filestack url.`);
             const { handleId, downloadUrl, publicId, format } = await getFilestackComponents(dateStr, photo, photo.url, photo.photoUrl)
             const filestackHandleIdToPath = await getFilestackHandleIdToPath()
@@ -315,7 +321,14 @@ async function migratePhoto(dateStr, photo, db, job) {
             after.photoUrl = s3Url
         }
 
-        if (photoUrlBaseFileName != jigVersionBaseFileName || photo.url.match(/cloudinary/)) {
+        if (!photo.url) {
+            log.info(`Date ${dateStr}: Photo ${photo._id}: No url in Photo object. Migrating from Cloudinary.`);
+            const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.photoUrl)
+            s3Url = await migrateToS3(dateStr, photo, downloadUrl, publicId, format, UPLOADS_TRANSFORMED_BUCKET)
+            migratedFiles.push({from: downloadUrl, to: s3Url, fromFormat: format, fromPublicId: publicId});
+            after.url = s3Url
+            after.photoUrl = s3Url
+        } else if (photoUrlBaseFileName != jigVersionBaseFileName || photo.url.match(/cloudinary/)) {
             log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl basename is different than jigVersion basename, or url is a Cloudinary url. Migrating from Cloudinary.`);
             const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.fullsize)
             s3Url = await migrateToS3(dateStr, photo, downloadUrl, publicId, format, UPLOADS_TRANSFORMED_BUCKET)
@@ -326,19 +339,28 @@ async function migratePhoto(dateStr, photo, db, job) {
             s3Url = s3Url ?? photo.url
         }
 
-        if (!after.jigVersion) {
+        if (photo.jigVersion && !after.jigVersion) {
             after.jigVersion = transformToFetchUrl(photo.jigVersion, s3Url);
         }
-        if (!after.previewThumbnail) {
+        if (photo.previewThumbnail && !after.previewThumbnail) {
             after.previewThumbnail = transformToFetchUrl(photo.previewThumbnail, s3Url);
         }
-        if (!after.photoUrl) {
+        if (photo.url && !after.photoUrl) {
             after.photoUrl = photo.url
         }
-        after.bigThumb = transformToFetchUrl(photo.bigThumb, s3Url);
-        after.fullsize = transformToFetchUrl(photo.fullsize, s3Url);
-        after.mediumThumb = transformToFetchUrl(photo.mediumThumb, s3Url);
-        after.smallThumb = transformToFetchUrl(photo.smallThumb, s3Url);
+
+        if (photo.bigThumb) {
+            after.bigThumb = transformToFetchUrl(photo.bigThumb, s3Url);
+        }
+        if (photo.fullsize) {
+            after.fullsize = transformToFetchUrl(photo.fullsize, s3Url);
+        }
+        if (photo.mediumThumb) {
+            after.mediumThumb = transformToFetchUrl(photo.mediumThumb, s3Url);
+        }
+        if (photo.smallThumb) {
+            after.smallThumb = transformToFetchUrl(photo.smallThumb, s3Url);
+        }
 
         if (DRY_RUN != 'false') {
             log.info(`Date ${dateStr}: Photo ${photo._id}: Dry run, not updating...`);
