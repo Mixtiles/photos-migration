@@ -217,23 +217,26 @@ async function migratePhoto(dateStr, photo, db, job) {
             throw new Error(error);
         }
 
+        const photoUrlFileName = photo.photoUrl.split('/').pop();
+
         const jigVersionFileName = photo.jigVersion?.split('/')?.pop();
         const bigThumbFileName = photo.bigThumb?.split('/')?.pop();
         const fullsizeFileName = photo.fullsize?.split('/')?.pop();
         const mediumThumbFileName = photo.mediumThumb?.split('/')?.pop();
         const previewThumbnailFileName = photo.previewThumbnail?.split('/')?.pop();
         const smallThumbFileName = photo.smallThumb?.split('/')?.pop();
-        const photoUrlFileName = photo.photoUrl.split('/').pop();
+        const other6FieldsFileName = jigVersionFileName ?? bigThumbFileName ?? fullsizeFileName ?? mediumThumbFileName ?? previewThumbnailFileName ?? smallThumbFileName
 
-        const jigVersionBaseFileName = jigVersionFileName?.split('.')?.[0]
         const photoUrlBaseFileName = photoUrlFileName.split('.')[0]
+        const other6FieldsBaseFileName = other6FieldsFileName?.split('.')?.[0]
 
         if (
-            (bigThumbFileName != undefined && (bigThumbFileName != photoUrlFileName)) ||
-            (fullsizeFileName != undefined && (fullsizeFileName != photoUrlFileName)) ||
-            (mediumThumbFileName != undefined && (mediumThumbFileName != photoUrlFileName)) ||
-            (previewThumbnailFileName != undefined && (previewThumbnailFileName != photoUrlFileName)) ||
-            (smallThumbFileName != undefined && (smallThumbFileName != photoUrlFileName))
+            (jigVersionFileName != undefined && (jigVersionFileName != other6FieldsFileName)) ||
+            (bigThumbFileName != undefined && (bigThumbFileName != other6FieldsFileName)) ||
+            (fullsizeFileName != undefined && (fullsizeFileName != other6FieldsFileName)) ||
+            (mediumThumbFileName != undefined && (mediumThumbFileName != other6FieldsFileName)) ||
+            (previewThumbnailFileName != undefined && (previewThumbnailFileName != other6FieldsFileName)) ||
+            (smallThumbFileName != undefined && (smallThumbFileName != other6FieldsFileName))
         ) {
             const error = `Date ${dateStr}: Photo ${photo._id}: Unlike expected, not all 6 photos are the same Cloudinary upload!`
             log.error(error);
@@ -328,11 +331,25 @@ async function migratePhoto(dateStr, photo, db, job) {
             migratedFiles.push({from: downloadUrl, to: s3Url, fromFormat: format, fromPublicId: publicId});
             after.url = s3Url
             after.photoUrl = s3Url
-        } else if (photoUrlBaseFileName != jigVersionBaseFileName || photo.url.match(/cloudinary/)) {
+        }
+        
+        if (photoUrlBaseFileName != other6FieldsBaseFileName || photo.url.match(/cloudinary/)) {
             log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl basename is different than jigVersion basename, or url is a Cloudinary url. Migrating from Cloudinary.`);
-            const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, photo.fullsize)
-            s3Url = await migrateToS3(dateStr, photo, downloadUrl, publicId, format, UPLOADS_TRANSFORMED_BUCKET)
-            migratedFiles.push({from: downloadUrl, to: s3Url, fromFormat: format, fromPublicId: publicId});
+            const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, 
+                photo.jigVersion ?? photo.bigThumb ?? photo.fullsize ?? photo.mediumThumb ?? photo.previewThumbnail ?? photo.smallThumb
+            )
+            try {
+                s3Url = await migrateToS3(dateStr, photo, downloadUrl, publicId, format, UPLOADS_TRANSFORMED_BUCKET)
+                migratedFiles.push({from: downloadUrl, to: s3Url, fromFormat: format, fromPublicId: publicId});
+            } catch (err) {
+                log.error(`Date ${dateStr}: Photo ${photo._id}: Error migrating from Cloudinary - transformed image: ${err}`);
+                if (err.response.status == 404) {
+                    log.error(`Date ${dateStr}: Photo ${photo._id}: Skipping migrating from Cloudinary - transformed image, as it doesn't exist. Using url as is.`);
+                    s3Url = s3Url ?? photo.url
+                } else {
+                    throw err
+                }
+            }
         } else {
             log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl basename is the same as jigVersion basename, and url is not a Cloudinary url. Using url as is.`);
             // s3Url here means non-Cloudinary. Almost always it's S3, but it still could be in other domains (filestck.com, etc.)
