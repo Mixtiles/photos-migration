@@ -84,7 +84,7 @@ async function migratePhotosFromDate (job) {
             }
         }
         
-        return { status: 'Success', numPhotosQueried: photos.length, numPhotosMigrated};
+        return { status: 'Success', numPhotosQueried: photos.length, numPhotosMigrated, date: dateStr};
     } catch (err) {
         log.error(err);
         throw err;
@@ -333,7 +333,7 @@ async function migratePhoto(dateStr, photo, db, job) {
             after.photoUrl = s3Url
         }
         
-        if (photoUrlBaseFileName != other6FieldsBaseFileName || photo.url.match(/cloudinary/)) {
+        if (photoUrlBaseFileName != other6FieldsBaseFileName || (photo.url && photo.url.match(/cloudinary/))) {
             log.info(`Date ${dateStr}: Photo ${photo._id}: photoUrl basename is different than jigVersion basename, or url is a Cloudinary url. Migrating from Cloudinary.`);
             const { downloadUrl, publicId, format } = await getCloudinaryComponents(dateStr, photo, 
                 photo.jigVersion ?? photo.bigThumb ?? photo.fullsize ?? photo.mediumThumb ?? photo.previewThumbnail ?? photo.smallThumb
@@ -342,11 +342,11 @@ async function migratePhoto(dateStr, photo, db, job) {
                 s3Url = await migrateToS3(dateStr, photo, downloadUrl, publicId, format, UPLOADS_TRANSFORMED_BUCKET)
                 migratedFiles.push({from: downloadUrl, to: s3Url, fromFormat: format, fromPublicId: publicId});
             } catch (err) {
-                log.error(`Date ${dateStr}: Photo ${photo._id}: Error migrating from Cloudinary - transformed image: ${err}`);
                 if (err.response.status == 404) {
                     log.error(`Date ${dateStr}: Photo ${photo._id}: Skipping migrating from Cloudinary - transformed image, as it doesn't exist. Using url as is.`);
                     s3Url = s3Url ?? photo.url
                 } else {
+                    log.error(`Date ${dateStr}: Photo ${photo._id}: Error migrating from Cloudinary - transformed image: ${err}`);
                     throw err
                 }
             }
