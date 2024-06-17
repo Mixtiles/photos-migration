@@ -4,6 +4,8 @@ const WEB_CONCURRENCY = parseInt(process.env.WEB_CONCURRENCY);
 const MONGO_URL = process.env.MONGO_URL
 const MONGO_DB_NAME = process.env.MONGO_DB_NAME
 const BATCH_SIZE = parseInt(process.env.BATCH_SIZE)
+const DELETE_BATCH_SIZE = parseInt(process.env.DELETE_BATCH_SIZE)
+const DELETE_NUM_PHOTOS = parseInt(process.env.DELETE_NUM_PHOTOS)
 const DRY_RUN = process.env.DRY_RUN;
 const MAX_PHOTOS_PER_DAY = parseInt(process.env.MAX_PHOTOS_PER_DAY);
 const UPLOADS_TRANSFORMED_BUCKET = process.env.UPLOADS_TRANSFORMED_BUCKET
@@ -19,7 +21,8 @@ const MAX_ACTIVE_JOBS = parseInt(process.env.MAX_ACTIVE_JOBS)
 if (!PORT || !REDIS_URL || !WEB_CONCURRENCY || !MONGO_URL || !MONGO_DB_NAME || 
     !BATCH_SIZE || !DRY_RUN || !MAX_PHOTOS_PER_DAY || !UPLOADS_TRANSFORMED_BUCKET || 
     !FILESTACK_BUCKET || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET || !CLOUDINARY_CLOUD_NAME || 
-    !AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !MAX_ACTIVE_JOBS
+    !AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !MAX_ACTIVE_JOBS ||
+    !DELETE_BATCH_SIZE || !DELETE_NUM_PHOTOS
 ) {
     throw new Error('One or more environment variables are missing!')
 }
@@ -42,6 +45,8 @@ module.exports = {
     MONGO_URL,
     MONGO_DB_NAME,
     BATCH_SIZE,
+    DELETE_BATCH_SIZE,
+    DELETE_NUM_PHOTOS,
     DRY_RUN,
     MAX_PHOTOS_PER_DAY,
     UPLOADS_TRANSFORMED_BUCKET,
