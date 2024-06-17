@@ -34,7 +34,7 @@ async function deletePhoto(photo, job) {
     }
   } catch (error) {
     log.info(
-      `Job ${job.id}: Error deleting photo - exception - ${photo}: ${error.stack}`,
+      `Job ${job.id}: Error deleting photo - exception - ${photo}: ${error}`,
     );
     return false;
   }
