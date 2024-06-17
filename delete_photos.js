@@ -53,6 +53,7 @@ async function deletePhotos(job) {
   try {
     await redisClient.connect();
 
+    const start_time = new Date()
     const numBatches = Math.ceil(DELETE_NUM_PHOTOS / DELETE_BATCH_SIZE);
     let numPhotosDeleted = 0;
     let numPhotosErrored = 0;
@@ -85,8 +86,9 @@ async function deletePhotos(job) {
       numPhotosDeleted += Object.values(imageToResult).filter(Boolean).length;
       numPhotosErrored += Object.values(imageToResult).filter((v) => !v).length;
     }
+    const end_time = new Date()
     log.info(
-      `Job ${job.id}: Done - Deleted ${numPhotosDeleted} photos, ${numPhotosErrored} errored`,
+      `Job ${job.id}: Done - Deleted ${numPhotosDeleted} photos, ${numPhotosErrored} errored. Took ${(end_time.getTime() - start_time.getTime()) / 1000} seconds (From ${start_time.toISOString()} to ${end_time.toISOString()})`, 
     );
   } catch (error) {
     log.info(`Job ${job.id}: Error deleting photos - exception - ${JSON.stringify(error)}`);
