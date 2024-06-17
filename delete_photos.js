@@ -34,7 +34,7 @@ async function deletePhoto(photo, job) {
     }
   } catch (error) {
     log.info(
-      `Job ${job.id}: Error deleting photo - exception - ${photo}: ${error}`,
+      `Job ${job.id}: Error deleting photo - exception - ${photo}: ${JSON.stringify(error)}`,
     );
     return false;
   }
@@ -89,7 +89,7 @@ async function deletePhotos(job) {
       `Job ${job.id}: Done - Deleted ${numPhotosDeleted} photos, ${numPhotosErrored} errored`,
     );
   } catch (error) {
-    log.info(`Job ${job.id}: Error deleting photos - exception - ${error.stack}`);
+    log.info(`Job ${job.id}: Error deleting photos - exception - ${JSON.stringify(error)}`);
     return false;
   } finally {
     await redisClient.disconnect();
