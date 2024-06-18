@@ -57,16 +57,21 @@ app.post('/job/:date', async (req, res) => {
   res.json({ id: job.id });
 });
 
-app.post('/job_delete/', async (req, res) => {
+app.post('/job_delete/:num_jobs', async (req, res) => {
   // This would be where you could pass arguments to the job
   // Ex: workQueue.add({ url: 'https://www.heroku.com' })
   // Docs: https://github.com/OptimalBits/bull/blob/develop/REFERENCE.md#queueadd
-  const job = await deleteQueue.add(
-    {
-      attempts: 1 // This tells Bull to attempt the job only once, with no retries after failure
-    }
-  );
-  res.json({ id: job.id });
+  const num_jobs = req.params.num_jobs;
+  const jobs = [];
+  for (let i = 0; i < num_jobs; i++) {
+    const job = await deleteQueue.add(
+      {
+        attempts: 1 // This tells Bull to attempt the job only once, with no retries after failure
+      }
+    );
+    jobs.push(job);
+  }
+  res.json(jobs.map(job => job.id));
 });
 // Allows the client to query the state of a background job
 app.get('/job/:id', async (req, res) => {
