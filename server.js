@@ -37,18 +37,24 @@ app.get('/', (req, res) => res.sendFile('index.html', { root: __dirname }));
 app.get('/client.js', (req, res) => res.sendFile('client.js', { root: __dirname }));
 
 // Kick off a new job by adding it to the work queue
-app.post('/job/:date', async (req, res) => {
+app.post('/job/:date/:type', async (req, res) => {
   // This would be where you could pass arguments to the job
   // Ex: workQueue.add({ url: 'https://www.heroku.com' })
   // Docs: https://github.com/OptimalBits/bull/blob/develop/REFERENCE.md#queueadd
   const date = req.params.date;
+  const type = req.params.type;
   if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) {
     res.status(400).json("Invalid Date").end();
+    return;
+  }
+  if (!["urlEqualsPhotoUrl", "onlyUrlIsNotNull", "regular"].includes(type)) {
+    res.status(400).json("Invalid Type").end();
     return;
   }
   const job = await workQueue.add(
     {
       date: date,
+      type: type
     }, 
     {
       attempts: 1 // This tells Bull to attempt the job only once, with no retries after failure
