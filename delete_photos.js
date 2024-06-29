@@ -25,26 +25,37 @@ async function deletePhoto(photo, job) {
   try {
     const res = await cloudinary.v2.uploader.destroy(photo);
     if (res.result === "ok") {
-      return true;
+      return "ok";
     } else {
       log.info(
         `Job ${job.id}: Error deleting photo - unexpected result - ${photo}: ${res.result}`,
       );
-      return false;
+      return "unexpected result";
     }
   } catch (error) {
+    if (res.result === "Too many concurrent upload_api_resource_destroy operations"){
+      log.info(
+        `Job ${job.id}: Error deleting photo - too many requests - ${photo}: ${res.result}`,
+      );
+      return "too many requests";
+    } else {
+    }
     log.info(
       `Job ${job.id}: Error deleting photo - exception - ${photo}: ${JSON.stringify(error)}`,
     );
-    return false;
+    return "exception";
   }
 }
 
 async function updateResult(photo, result, redisClient) {
-  if (result == true) {
+  if (result == "ok") {
     await redisClient.sAdd(DELETED_PHOTOS_SET, photo);
-  } else {
+  } else if (result == "unexpected result" || result == "exception") {
     await redisClient.sAdd(DELETED_PHOTOS_ERRORS_SET, photo);
+  } else if (result == "too many requests") {
+    await redisClient.sAdd(PHOTOS_TO_DELETE_SET, photo);
+  } else {
+    log.info(`Error updaing result - ${photo} - Unexpected result: ${result}`);
   }
 }
 
