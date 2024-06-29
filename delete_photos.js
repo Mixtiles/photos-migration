@@ -65,7 +65,6 @@ async function updateResult(photo, result, redisClient) {
 async function deletePhotos(job) {
   const redisClient = createClient({ url: REDIS_URL });
   try {
-    a = b
     await redisClient.connect();
 
     const start_time = new Date()
