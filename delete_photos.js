@@ -25,6 +25,9 @@ async function deletePhoto(photo, job) {
   try {
     const res = await cloudinary.v2.uploader.destroy(photo);
     if (res.result === "ok") {
+      log.info(
+        `Job ${job.id}: Photo deleted successfully - ${photo}: ${res.result}`,
+      );
       return "ok";
     } else {
       log.info(
@@ -35,7 +38,7 @@ async function deletePhoto(photo, job) {
   } catch (error) {
     if (res.result === "Too many concurrent upload_api_resource_destroy operations"){
       log.info(
-        `Job ${job.id}: Error deleting photo - too many requests - ${photo}: ${res.result}`,
+        `Job ${job.id}: Error deleting photo - too many requests - ${photo}: ${JSON.stringify(error)}`,
       );
       return "too many requests";
     } else {
