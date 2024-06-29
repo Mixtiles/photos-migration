@@ -29,6 +29,11 @@ async function deletePhoto(photo, job) {
         `Job ${job.id}: Photo deleted successfully - ${photo}: ${res.result}`,
       );
       return "ok";
+    } else if (res.result === "not found") {
+      log.warn(
+        `Job ${job.id}: Photo not found - ${photo}: ${res.result}`,
+      );
+      return "not found";
     } else {
       log.error(
         `Job ${job.id}: Error deleting photo - unexpected result - ${photo}: ${res.result}`,
@@ -51,7 +56,7 @@ async function deletePhoto(photo, job) {
 }
 
 async function updateResult(photo, result, redisClient) {
-  if (result == "ok") {
+  if (result == "ok" || result == "not found") {
     await redisClient.sAdd(DELETED_PHOTOS_SET, photo);
   } else if (result == "unexpected result" || result == "exception") {
     await redisClient.sAdd(DELETED_PHOTOS_ERRORS_SET, photo);
@@ -72,6 +77,7 @@ async function deletePhotos(job) {
     let numPhotosDeleted = 0;
     let numPhotosErrored = 0;
     let numPhotosRateLimit = 0;
+    let numPhotosNotFound = 0;
 
     log.info(
       `Job ${job.id}: Going to delete ${DELETE_NUM_PHOTOS} photos in ${numBatches} batches of ${DELETE_BATCH_SIZE}`,
@@ -101,10 +107,11 @@ async function deletePhotos(job) {
       numPhotosDeleted += Object.values(imageToResult).filter((v) => v === "ok").length;
       numPhotosErrored += Object.values(imageToResult).filter((v) => v === "unexpected result" || v === "exception").length;
       numPhotosRateLimit += Object.values(imageToResult).filter((v) => v === "too many requests").length;
+      numPhotosNotFound += Object.values(imageToResult).filter((v) => v === "not found").length;
     }
     const end_time = new Date()
     log.info(
-      `Job ${job.id}: Done - Deleted ${numPhotosDeleted} photos, ${numPhotosErrored} errored, ${numPhotosRateLimit} rate limited. Took ${(end_time.getTime() - start_time.getTime()) / 1000} seconds (From ${start_time.toISOString()} to ${end_time.toISOString()})`,
+      `Job ${job.id}: Done - Deleted ${numPhotosDeleted} photos, ${numPhotosErrored} errored, ${numPhotosRateLimit} rate limited, ${numPhotosNotFound} not found. Took ${(end_time.getTime() - start_time.getTime()) / 1000} seconds (From ${start_time.toISOString()} to ${end_time.toISOString()})`,
     );
   } catch (error) {
     log.error(`Job ${job.id}: Error deleting photos - exception - ${error} - ${error.stack}`);
