@@ -39,11 +39,11 @@ async function deletePhoto(photo, job) {
       );
       return "too many requests";
     } else {
+      log.info(
+        `Job ${job.id}: Error deleting photo - exception - ${photo}: ${JSON.stringify(error)}`,
+      );
+      return "exception";
     }
-    log.info(
-      `Job ${job.id}: Error deleting photo - exception - ${photo}: ${JSON.stringify(error)}`,
-    );
-    return "exception";
   }
 }
 
