@@ -71,6 +71,7 @@ async function deletePhotos(job) {
     const numBatches = Math.ceil(DELETE_NUM_PHOTOS / DELETE_BATCH_SIZE);
     let numPhotosDeleted = 0;
     let numPhotosErrored = 0;
+    let numPhotosRateLimit = 0;
 
     log.info(
       `Job ${job.id}: Going to delete ${DELETE_NUM_PHOTOS} photos in ${numBatches} batches of ${DELETE_BATCH_SIZE}`,
@@ -97,12 +98,13 @@ async function deletePhotos(job) {
           updateResult(photo, imageToResult[photo], redisClient),
         ),
       );
-      numPhotosDeleted += Object.values(imageToResult).filter(Boolean).length;
-      numPhotosErrored += Object.values(imageToResult).filter((v) => !v).length;
+      numPhotosDeleted += Object.values(imageToResult).filter((v) => v === "ok").length;
+      numPhotosErrored += Object.values(imageToResult).filter((v) => v === "unexpected result" || v === "exception").length;
+      numPhotosRateLimit += Object.values(imageToResult).filter((v) => v === "too many requests").length;
     }
     const end_time = new Date()
     log.info(
-      `Job ${job.id}: Done - Deleted ${numPhotosDeleted} photos, ${numPhotosErrored} errored. Took ${(end_time.getTime() - start_time.getTime()) / 1000} seconds (From ${start_time.toISOString()} to ${end_time.toISOString()})`, 
+      `Job ${job.id}: Done - Deleted ${numPhotosDeleted} photos, ${numPhotosErrored} errored, ${numPhotosRateLimit} rate limited. Took ${(end_time.getTime() - start_time.getTime()) / 1000} seconds (From ${start_time.toISOString()} to ${end_time.toISOString()})`,
     );
   } catch (error) {
     log.error(`Job ${job.id}: Error deleting photos - exception - ${error} - ${error.stack}`);
