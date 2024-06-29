@@ -36,7 +36,7 @@ async function deletePhoto(photo, job) {
       return "unexpected result";
     }
   } catch (error) {
-    if (res.result === "Too many concurrent upload_api_resource_destroy operations"){
+    if (error.message === "Too many concurrent upload_api_resource_destroy operations"){
       log.error(
         `Job ${job.id}: Error deleting photo - too many requests - ${photo}: ${JSON.stringify(error)}`,
       );
