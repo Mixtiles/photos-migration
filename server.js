@@ -31,6 +31,17 @@ const deleteQueue = new Queue('delete', {
   }
 });
 
+const backupQueue = new Queue('backup', { 
+  redis: redisOptions,
+  settings: { 
+    // If a worker doesn't report every 15 minutes, it is considered dead
+    stalledInterval: 15*60*100,
+    maxStalledCount: 100,
+    // Sometimes it takes it more than 5 minutes - so we just skip that test
+    skipStalledCheck: false,
+  }
+});
+
 
 // Serve the two static assets
 app.get('/', (req, res) => res.sendFile('index.html', { root: __dirname }));
@@ -79,6 +90,24 @@ app.post('/job_delete/:num_jobs', async (req, res) => {
   }
   res.json(jobs.map(job => job.id));
 });
+
+app.post('/job_backup/:num_jobs', async (req, res) => {
+  // This would be where you could pass arguments to the job
+  // Ex: workQueue.add({ url: 'https://www.heroku.com' })
+  // Docs: https://github.com/OptimalBits/bull/blob/develop/REFERENCE.md#queueadd
+  const num_jobs = req.params.num_jobs;
+  const jobs = [];
+  for (let i = 0; i < num_jobs; i++) {
+    const job = await backupQueue.add(
+      {
+        attempts: 1 // This tells Bull to attempt the job only once, with no retries after failure
+      }
+    );
+    jobs.push(job);
+  }
+  res.json(jobs.map(job => job.id));
+});
+
 // Allows the client to query the state of a background job
 app.get('/job/:id', async (req, res) => {
   const id = req.params.id;
@@ -98,6 +127,21 @@ app.get('/job/:id', async (req, res) => {
 app.get('/job_delete/:id', async (req, res) => {
   const id = req.params.id;
   const job = await deleteQueue.getJob(id);
+
+  if (job === null) {
+    res.status(404).end();
+  } else {
+    const state = await job.getState();
+    const progress = job._progress;
+    const reason = job.failedReason;
+    const data = job.data;
+    res.json({ id, state, progress, reason, data });
+  }
+});
+
+app.get('/job_backup/:id', async (req, res) => {
+  const id = req.params.id;
+  const job = await backupQueue.getJob(id);
 
   if (job === null) {
     res.status(404).end();

@@ -63,7 +63,7 @@ async function updateResult(photo, result, redisClient) {
   } else if (result == "too many requests") {
     await redisClient.sAdd(PHOTOS_TO_DELETE_SET, photo);
   } else {
-    log.error(`Error updaing result - ${photo} - Unexpected result: ${result}`);
+    log.error(`Error updating delete result - ${photo} - Unexpected result: ${result}`);
   }
 }
 
